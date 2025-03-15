@@ -1,0 +1,166 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = game.Workspace.CurrentCamera
+
+local player = Players.LocalPlayer
+
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.Name = "GScriptMenu"
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 150)
+Frame.Position = UDim2.new(0.05, 0, 0.1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Text = "GScript V 1.0.1"
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.TextScaled = true
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Parent = Frame
+
+
+local AimAssistButton = Instance.new("TextButton")
+AimAssistButton.Text = "Aim Assist: OFF"
+AimAssistButton.Size = UDim2.new(1, -20, 0, 40)
+AimAssistButton.Position = UDim2.new(0, 10, 0, 40)
+AimAssistButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+AimAssistButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimAssistButton.Parent = Frame
+
+local AimUICorner = Instance.new("UICorner")
+AimUICorner.CornerRadius = UDim.new(0, 8)
+AimUICorner.Parent = AimAssistButton
+
+
+local ESPButton = Instance.new("TextButton")
+ESPButton.Text = "ESP: OFF"
+ESPButton.Size = UDim2.new(1, -20, 0, 40)
+ESPButton.Position = UDim2.new(0, 10, 0, 90)
+ESPButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPButton.Parent = Frame
+
+local ESPUICorner = Instance.new("UICorner")
+ESPUICorner.CornerRadius = UDim.new(0, 8)
+ESPUICorner.Parent = ESPButton
+
+
+local aimAssistEnabled = false
+local aimKey = Enum.KeyCode.G
+local smoothing = 1 -- Smooth tracking factor
+
+
+local espEnabled = false
+local espObjects = {}
+local espKey = Enum.KeyCode.H
+
+
+local function getClosestTarget()
+    local closestDistance = math.huge
+    local closestHead = nil
+
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character then
+            local head = otherPlayer.Character:FindFirstChild("Head")
+            local humanoid = otherPlayer.Character:FindFirstChild("Humanoid")
+            if head and humanoid and humanoid.Health > 0 then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        closestHead = head
+                    end
+                end
+            end
+        end
+    end
+    return closestHead
+end
+
+
+local function aimAssist()
+    if aimAssistEnabled then
+        local targetHead = getClosestTarget()
+        if targetHead then
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, smoothing)
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(aimAssist)
+
+--// ESP Function
+local function applyESP(character)
+    if character and not espObjects[character] then
+        local highlight = Instance.new("Highlight")
+        highlight.Parent = character
+        highlight.FillColor = Color3.new(1, 0, 0) -- Red
+        highlight.FillTransparency = 0.2
+        highlight.OutlineTransparency = 1
+        espObjects[character] = highlight
+    end
+end
+
+local function enableESP()
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player then
+            local character = otherPlayer.Character
+            if character then applyESP(character) end
+            otherPlayer.CharacterAdded:Connect(applyESP)
+        end
+    end
+end
+
+local function disableESP()
+    for _, highlight in pairs(espObjects) do
+        if highlight then highlight:Destroy() end
+    end
+    espObjects = {}
+end
+
+--// Toggle Aim Assist (Button & Keybind)
+local function toggleAimAssist()
+    aimAssistEnabled = not aimAssistEnabled
+    AimAssistButton.Text = "Aim Assist: " .. (aimAssistEnabled and "ON" or "OFF")
+    AimAssistButton.BackgroundColor3 = aimAssistEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
+end
+
+AimAssistButton.MouseButton1Click:Connect(toggleAimAssist)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == aimKey and not gameProcessed then
+        toggleAimAssist()
+    end
+end)
+
+
+local function toggleESP()
+    espEnabled = not espEnabled
+    ESPButton.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
+    ESPButton.BackgroundColor3 = espEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
+
+    if espEnabled then
+        enableESP()
+    else
+        disableESP()
+    end
+end
+
+ESPButton.MouseButton1Click:Connect(toggleESP)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == espKey and not gameProcessed then
+        toggleESP()
+    end
+end)
